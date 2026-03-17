@@ -8,16 +8,22 @@ void NetworkManager::connect() {
 
     Serial.println("\n=================================");
     Serial.printf("[WIFI] Connecting to SSID: %s\n", ssid);
+    Serial.printf("[WIFI] Configuring DNS with: %s\n", dnsServer ? dnsServer : "(null)");
 
-    // Parse the DNS string from the .env file
-    IPAddress primaryDNS;
-    if (primaryDNS.fromString(dnsServer)) {
-        IPAddress no_ip(0, 0, 0, 0); // Signals ESP32 to keep using DHCP for local IP
-        WiFi.config(no_ip, no_ip, no_ip, primaryDNS);
-        Serial.printf("[WIFI] Custom DNS Applied: %s\n", dnsServer);
+    // Force custom DNS and avoid router-provided DNS fallback.
+    const char* fallbackDns = "192.168.66.6";
+    IPAddress selectedDNS;
+    bool hasEnvDns = (dnsServer != nullptr) && (strlen(dnsServer) > 0);
+    if (hasEnvDns && selectedDNS.fromString(dnsServer)) {
+        Serial.printf("[WIFI] Using DNS from .env: %s\n", dnsServer);
     } else {
-        Serial.println("[WIFI] Warning: Invalid DNS format in .env. Falling back to router default.");
+        selectedDNS.fromString(fallbackDns);
+        Serial.printf("[WIFI] Invalid/empty DNS in .env. Forcing fallback DNS: %s\n", fallbackDns);
     }
+
+    IPAddress no_ip(0, 0, 0, 0); // Keep DHCP for IP/GW/subnet, but force DNS.
+    WiFi.config(no_ip, no_ip, no_ip, selectedDNS, selectedDNS);
+    Serial.printf("[WIFI] Custom DNS Applied (primary/secondary): %s\n", selectedDNS.toString().c_str());
 
     WiFi.begin(ssid, password);
 
